@@ -58,7 +58,7 @@ ${documentText}
 [강의 자료 전문 끝]
 `.trim();
 
-    const result = streamText({
+    const result = await streamText({
       model: openai(getModelName()),
       system: systemPrompt,
       prompt: userPrompt,

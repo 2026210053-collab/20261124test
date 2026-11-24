@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       ];
     }
 
-    const result = streamText({
+    const result = await streamText({
       model: openai(getModelName()),
       system: systemPrompt,
       messages: conversationMessages,
