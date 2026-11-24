@@ -1,24 +1,30 @@
-import { createOpenAI } from '@ai-sdk/openai';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 
 /**
- * OpenAI 인스턴스 초기화 유틸리티
- * 사용자가 .env.local에 설정한 OPENAI_API_KEY를 자동으로 감지합니다.
+ * Google Gemini AI 공급자 초기화 유틸리티
+ *
+ * [우선순위]
+ * 1. 클라이언트(사용자 브라우저)에서 사용자가 직접 입력한 API Key
+ * 2. 서버 환경변수 (GEMINI_API_KEY 또는 GOOGLE_GENERATIVE_AI_API_KEY)
  */
-export function getOpenAIProvider() {
-  const apiKey = process.env.OPENAI_API_KEY;
+export function getGeminiProvider(customApiKey?: string) {
+  const apiKey =
+    customApiKey?.trim() ||
+    process.env.GEMINI_API_KEY?.trim() ||
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim();
 
-  if (!apiKey || apiKey.trim() === '' || apiKey.includes('your_openai_api_key_here')) {
+  if (!apiKey || apiKey === '' || apiKey.includes('your_gemini_api_key')) {
     return null;
   }
 
-  return createOpenAI({
-    apiKey: apiKey.trim(),
+  return createGoogleGenerativeAI({
+    apiKey,
   });
 }
 
 /**
- * 사용할 기본 AI 모델 이름 가져오기
+ * 사용할 기본 Gemini 모델 이름 (기본값: gemini-3.8-flash)
  */
-export function getModelName(): string {
-  return process.env.OPENAI_MODEL || 'gpt-4o-mini';
+export function getGeminiModelName(): string {
+  return process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 }

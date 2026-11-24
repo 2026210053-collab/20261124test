@@ -1,46 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateObject } from 'ai';
 import { z } from 'zod';
-import { getOpenAIProvider, getModelName } from '@/lib/ai-provider';
+import { getGeminiProvider, getGeminiModelName } from '@/lib/ai-provider';
 import { buildQuizSystemPrompt } from '@/lib/prompts';
 import { QuizData } from '@/lib/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Vercel AI SDK generateObject용 엄격한 Zod 스키마 정의
 const quizResponseSchema = z.object({
-  title: z.string().describe('퀴즈 세트의 제목 (예: 성인간호학 당뇨병 및 DKA 핵심 복습 퀴즈)'),
-  description: z.string().describe('퀴즈에 대한 간략한 설명 및 출제 범위'),
+  title: z.string().describe('퀴즈 세트의 제목'),
+  description: z.string().describe('퀴즈 안내 설명'),
   questions: z.array(
     z.object({
-      id: z.number().describe('문제 고유 번호 (1부터 순서대로 부여)'),
-      type: z.enum(['multiple_choice', 'ox']).describe('문제 유형 (multiple_choice 또는 ox)'),
-      question: z.string().describe('간호학 시험에 출제 가능한 명확하고 구체적인 질문'),
-      options: z
-        .array(z.string())
-        .describe(
-          '선택지 배열. 4지선다는 반드시 4개 선택지, OX형은 ["O (그렇다)", "X (아니다)"]의 2개 선택지'
-        ),
-      correctAnswerIndex: z
-        .number()
-        .describe('정답 선택지의 인덱스 (0, 1, 2, 3 중 하나)'),
-      explanation: z
-        .string()
-        .describe(
-          '정답인 이유와 오답인 이유를 강의 자료 내용에 근거하여 명확하게 해설 (근거 페이지 p.X 명시)'
-        ),
-      sourcePage: z.number().describe('강의 자료에서 이 문제의 정답 근거가 위치한 실제 페이지 번호'),
-      conceptTag: z
-        .string()
-        .describe('간호학 핵심 영역 태그 (예: 병태생리, 약물요법, 간호중재, 응급간호, 진단기준)'),
+      id: z.number().describe('문제 번호'),
+      type: z.enum(['multiple_choice', 'ox']).describe('문제 유형'),
+      question: z.string().describe('간호학 시험 질문'),
+      options: z.array(z.string()).describe('선택지 목록'),
+      correctAnswerIndex: z.number().describe('정답 인덱스'),
+      explanation: z.string().describe('정답 및 오답 해설 (근거 페이지 명시)'),
+      sourcePage: z.number().describe('강의 자료 내 근거 페이지 번호'),
+      conceptTag: z.string().describe('간호학 핵심 영역 태그'),
     })
   ).min(3).max(10),
 });
 
-/**
- * 기본 예비 퀴즈 데이터 (API 키 미설정 시 또는 테스트용)
- */
 const SAMPLE_FALLBACK_QUIZ: QuizData = {
   title: '당뇨병 및 DKA 핵심 복습 퀴즈 (샘플)',
   description: '강의 자료 내용을 바탕으로 엄선된 핵심 5문항 퀴즈입니다.',
@@ -121,12 +105,9 @@ const SAMPLE_FALLBACK_QUIZ: QuizData = {
   ],
 };
 
-/**
- * 맞춤형 복습 퀴즈 생성 API
- */
 export async function POST(req: NextRequest) {
   try {
-    const { documentText, questionCount = 5 } = await req.json();
+    const { documentText, questionCount = 5, apiKey } = await req.json();
 
     if (!documentText || typeof documentText !== 'string' || documentText.trim().length === 0) {
       return NextResponse.json(
@@ -135,16 +116,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const openai = getOpenAIProvider();
+    const google = getGeminiProvider(apiKey);
 
-    // API 키가 없는 경우 친절한 안내와 함께 샘플 퀴즈 데이터 반환 (비개발자 UX 배려)
-    if (!openai) {
+    if (!google) {
       return NextResponse.json({
         success: true,
         quiz: SAMPLE_FALLBACK_QUIZ,
         isFallback: true,
         notice:
-          'OpenAI API 키가 설정되지 않아 샘플 퀴즈가 표시되었습니다. 실제 문서 기반 맞춤 퀴즈를 생성하려면 .env.local에 OPENAI_API_KEY를 등록해 주세요.',
+          'Gemini API 키가 입력되지 않아 샘플 퀴즈가 표시되었습니다. 상단 [API 키 설정] 버튼으로 키를 등록하시면 업로드한 자료 기반 퀴즈가 생성됩니다.',
       });
     }
 
@@ -152,15 +132,13 @@ export async function POST(req: NextRequest) {
     const userPrompt = `
 아래 제공된 [강의 자료]만을 바탕으로, 간호학생이 핵심 개념을 복습할 수 있도록 총 ${questionCount}문제의 퀴즈(4지선다형 및 O/X형 혼합)를 생성해 주세요.
 각 문제마다 반드시 강의 자료 내의 근거 페이지 번호(sourcePage: 숫자)를 지정하고, 상세한 정답/오답 해설을 작성하세요.
-절대 자료에 없는 임의의 내용을 출제하지 마세요.
 `.trim();
 
     const result = await generateObject({
-      model: openai(getModelName()),
+      model: google(getGeminiModelName()),
       schema: quizResponseSchema,
       system: systemPrompt,
       prompt: userPrompt,
-      temperature: 0.1, // 문제 및 정답 일관성을 위해 낮은 온도 설정
     });
 
     return NextResponse.json({
@@ -174,7 +152,7 @@ export async function POST(req: NextRequest) {
       {
         error:
           error?.message ||
-          '퀴즈를 생성하는 도중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.',
+          '퀴즈를 생성하는 도중 오류가 발생했습니다. API 키가 유효한지 확인해 주세요.',
       },
       { status: 500 }
     );

@@ -13,30 +13,34 @@ import {
   Filter,
   Check,
   Sparkles,
+  Key,
 } from 'lucide-react';
-import { ParsedDocument, QuizData, QuizQuestion } from '@/lib/types';
+import { ParsedDocument, QuizData } from '@/lib/types';
 
 interface QuizViewProps {
   document: ParsedDocument;
+  apiKey: string;
+  onOpenApiKeyModal: () => void;
 }
 
-export const QuizView: React.FC<QuizViewProps> = ({ document }) => {
+export const QuizView: React.FC<QuizViewProps> = ({
+  document,
+  apiKey,
+  onOpenApiKeyModal,
+}) => {
   const [quizData, setQuizData] = useState<QuizData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  // 사용자의 선택 답안 맵 (questionId -> selectedOptionIndex)
   const [userAnswers, setUserAnswers] = useState<Record<number, number>>({});
-
-  // 오답 노트 필터 모드 (틀린 문제만 모아보기)
   const [showWrongOnly, setShowWrongOnly] = useState<boolean>(false);
 
   useEffect(() => {
     if (document) {
       loadQuiz();
     }
-  }, [document.metadata.fileName]);
+  }, [document.metadata.fileName, apiKey]);
 
   const loadQuiz = async () => {
     setIsLoading(true);
@@ -52,6 +56,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ document }) => {
         body: JSON.stringify({
           documentText: document.fullText,
           questionCount: 5,
+          apiKey: apiKey.trim(),
         }),
       });
 
@@ -74,7 +79,6 @@ export const QuizView: React.FC<QuizViewProps> = ({ document }) => {
   };
 
   const handleSelectAnswer = (questionId: number, optionIndex: number) => {
-    // 이미 푼 문제는 선택 변경 불가 (한 번 풀면 피드백 제공)
     if (userAnswers[questionId] !== undefined) return;
 
     setUserAnswers((prev) => ({
@@ -92,7 +96,7 @@ export const QuizView: React.FC<QuizViewProps> = ({ document }) => {
         </div>
         <div className="text-center space-y-1">
           <p className="text-sm font-bold text-slate-800">
-            강의 자료를 바탕으로 맞춤형 복습 퀴즈를 출제하고 있습니다...
+            Gemini 3.8 Flash가 맞춤형 복습 퀴즈를 출제하고 있습니다...
           </p>
           <p className="text-xs text-slate-500">
             4지선다형 및 O/X 문제와 근거 페이지를 정밀 검증 중입니다.
@@ -116,13 +120,22 @@ export const QuizView: React.FC<QuizViewProps> = ({ document }) => {
             {error || '퀴즈 데이터가 존재하지 않습니다.'}
           </p>
         </div>
-        <button
-          onClick={loadQuiz}
-          className="inline-flex items-center px-4 py-2 bg-teal-600 text-white text-xs font-semibold rounded-xl hover:bg-teal-700 transition-colors"
-        >
-          <RotateCw className="w-3.5 h-3.5 mr-1.5" />
-          다시 시도
-        </button>
+        <div className="flex space-x-2">
+          <button
+            onClick={onOpenApiKeyModal}
+            className="inline-flex items-center px-4 py-2 bg-amber-600 text-white text-xs font-semibold rounded-xl hover:bg-amber-700 transition-colors"
+          >
+            <Key className="w-3.5 h-3.5 mr-1.5" />
+            API 키 확인
+          </button>
+          <button
+            onClick={loadQuiz}
+            className="inline-flex items-center px-4 py-2 bg-teal-600 text-white text-xs font-semibold rounded-xl hover:bg-teal-700 transition-colors"
+          >
+            <RotateCw className="w-3.5 h-3.5 mr-1.5" />
+            다시 시도
+          </button>
+        </div>
       </div>
     );
   }
@@ -131,7 +144,6 @@ export const QuizView: React.FC<QuizViewProps> = ({ document }) => {
   const answeredCount = Object.keys(userAnswers).length;
   const totalQuestions = questions.length;
 
-  // 정답 및 오답 통계 계산
   const correctCount = questions.filter(
     (q) => userAnswers[q.id] === q.correctAnswerIndex
   ).length;
@@ -145,7 +157,6 @@ export const QuizView: React.FC<QuizViewProps> = ({ document }) => {
 
   return (
     <div className="flex flex-col h-full bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      {/* 퀴즈 상단 헤더 */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-100 bg-slate-50/50">
         <div>
           <div className="flex items-center space-x-2">
@@ -158,15 +169,13 @@ export const QuizView: React.FC<QuizViewProps> = ({ document }) => {
         </div>
 
         <div className="flex items-center space-x-2">
-          {/* 오답 노트 토글 버튼 */}
           {answeredCount > 0 && wrongQuestions.length > 0 && (
             <button
               onClick={() => setShowWrongOnly(!showWrongOnly)}
-              className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
-                showWrongOnly
+              className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${showWrongOnly
                   ? 'bg-rose-50 text-rose-700 border-rose-300'
                   : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-              }`}
+                }`}
             >
               <Filter className="w-3.5 h-3.5 mr-1 text-rose-500" />
               <span>오답 노트만 보기 ({wrongQuestions.length})</span>
@@ -183,15 +192,21 @@ export const QuizView: React.FC<QuizViewProps> = ({ document }) => {
         </div>
       </div>
 
-      {/* API 키 미설정 시 안내 배너 */}
       {notice && (
-        <div className="px-6 py-2.5 bg-amber-50 border-b border-amber-200/80 text-xs text-amber-800 flex items-center space-x-2">
-          <Sparkles className="w-4 h-4 text-amber-600 flex-shrink-0" />
-          <span>{notice}</span>
+        <div className="px-6 py-2.5 bg-amber-50 border-b border-amber-200/80 text-xs text-amber-900 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Sparkles className="w-4 h-4 text-amber-600 flex-shrink-0" />
+            <span>{notice}</span>
+          </div>
+          <button
+            onClick={onOpenApiKeyModal}
+            className="text-xs font-bold underline underline-offset-2 text-amber-800 hover:text-amber-950 flex-shrink-0 ml-2"
+          >
+            API 키 입력하기
+          </button>
         </div>
       )}
 
-      {/* 진행 상황 및 스코어 바 */}
       <div className="px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs text-slate-600">
         <div className="flex items-center space-x-3">
           <span>
@@ -208,7 +223,6 @@ export const QuizView: React.FC<QuizViewProps> = ({ document }) => {
           )}
         </div>
 
-        {/* 진행 바 */}
         <div className="w-36 sm:w-48 bg-slate-200 rounded-full h-2 overflow-hidden">
           <div
             className="bg-teal-600 h-2 rounded-full transition-all duration-300"
@@ -217,7 +231,6 @@ export const QuizView: React.FC<QuizViewProps> = ({ document }) => {
         </div>
       </div>
 
-      {/* 완료 시 결과 축하 카드 */}
       {isFinished && !showWrongOnly && (
         <div className="m-6 p-5 rounded-2xl bg-gradient-to-r from-teal-50 to-sky-50 border border-teal-200 flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -247,7 +260,6 @@ export const QuizView: React.FC<QuizViewProps> = ({ document }) => {
         </div>
       )}
 
-      {/* 문제 리스트 영역 */}
       <div className="flex-1 p-6 overflow-y-auto space-y-6 max-h-[calc(100vh-16rem)]">
         {displayedQuestions.map((q, idx) => {
           const userAnswer = userAnswers[q.id];
@@ -257,15 +269,13 @@ export const QuizView: React.FC<QuizViewProps> = ({ document }) => {
           return (
             <div
               key={q.id}
-              className={`p-5 rounded-xl border transition-all ${
-                isAnswered
+              className={`p-5 rounded-xl border transition-all ${isAnswered
                   ? isCorrect
                     ? 'border-emerald-200 bg-emerald-50/20'
                     : 'border-rose-200 bg-rose-50/20'
                   : 'border-slate-200 bg-white hover:border-slate-300'
-              }`}
+                }`}
             >
-              {/* 문제 헤더 (태그, 번호, 근거 페이지) */}
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-2">
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-slate-100 text-slate-700">
@@ -285,12 +295,10 @@ export const QuizView: React.FC<QuizViewProps> = ({ document }) => {
                 </div>
               </div>
 
-              {/* 문제 지문 */}
               <h3 className="text-sm font-bold text-slate-900 leading-snug mb-4">
                 {q.question}
               </h3>
 
-              {/* 선택지 목록 */}
               <div className="space-y-2">
                 {q.options.map((option, optIdx) => {
                   const isSelected = userAnswer === optIdx;
@@ -344,14 +352,12 @@ export const QuizView: React.FC<QuizViewProps> = ({ document }) => {
                 })}
               </div>
 
-              {/* 정답 확인 후 상세 해설 박스 */}
               {isAnswered && (
                 <div
-                  className={`mt-4 p-4 rounded-xl border text-xs leading-relaxed animate-in fade-in duration-200 ${
-                    isCorrect
+                  className={`mt-4 p-4 rounded-xl border text-xs leading-relaxed animate-in fade-in duration-200 ${isCorrect
                       ? 'bg-emerald-50/60 border-emerald-200 text-emerald-900'
                       : 'bg-rose-50/60 border-rose-200 text-rose-900'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center space-x-1.5 font-bold mb-1">
                     {isCorrect ? (

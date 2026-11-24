@@ -1,22 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { streamText } from 'ai';
-import { getOpenAIProvider, getModelName } from '@/lib/ai-provider';
+import { getGeminiProvider, getGeminiModelName } from '@/lib/ai-provider';
 import { buildSummarySystemPrompt } from '@/lib/prompts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * 간호학 강의 자료 핵심 요약 스트리밍 API
- *
- * [핵심 원칙]
- * 1. 업로드된 문서 텍스트만을 기반으로 체계적 마크다운 요약 생성
- * 2. 모든 요약 포인트에 근거 페이지 (p.X) 표기 강제
- * 3. OpenAI API 키가 없을 경우 친절한 설정 안내 또는 예비 요약 반환
+ * 간호학 강의 자료 핵심 요약 스트리밍 API (Gemini 3.8 Flash 지원)
  */
 export async function POST(req: NextRequest) {
   try {
-    const { documentText, documentTitle } = await req.json();
+    const { documentText, documentTitle, apiKey } = await req.json();
 
     if (!documentText || typeof documentText !== 'string' || documentText.trim().length === 0) {
       return NextResponse.json(
@@ -25,20 +20,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const openai = getOpenAIProvider();
+    const google = getGeminiProvider(apiKey);
 
-    // API 키 미설정 시 대응 안내
-    if (!openai) {
+    // API 키 미입력 시 친절한 안내 메시지 반환
+    if (!google) {
       const fallbackNotice = `
-### ⚠️ OpenAI API 키가 설정되지 않았습니다.
+### ⚠️ Gemini API 키가 필요합니다.
 
-AI 요약 기능을 실행하려면 프로젝트 루트의 \`.env.local\` 파일에 OpenAI API 키를 입력해야 합니다:
+실시간 AI 요약을 사용하려면 상단의 **[Gemini API 키 입력]** 버튼을 클릭하여 본인의 API 키를 입력해 주세요.
 
-\`\`\`env
-OPENAI_API_KEY=sk-...여러분의_실제_API키
-\`\`\`
-
-> 💡 **안내:** API 키를 입력하고 로컬 서버를 재시작(\`npm run dev\`)하면 OpenAI gpt-4o-mini 모델을 통해 업로드된 강의 자료의 100% 근거 기반 실시간 스트리밍 요약이 작동합니다.
+> 💡 **Google AI Studio 무료 키 발급 안내:**
+> - [Google AI Studio (https://aistudio.google.com/app/apikey)](https://aistudio.google.com/app/apikey)에 구글 계정으로 로그인하시면 **신용카드 없이 무료로 즉시 발급**받으실 수 있습니다.
+> - 발급받은 키는 본인의 웹 브라우저에만 안전하게 저장되며 외부 서버로 전송되지 않습니다.
 `.trim();
 
       return new Response(fallbackNotice, {
@@ -59,10 +52,9 @@ ${documentText}
 `.trim();
 
     const result = await streamText({
-      model: openai(getModelName()),
+      model: google(getGeminiModelName()),
       system: systemPrompt,
       prompt: userPrompt,
-      temperature: 0.1, // 환각 방지를 위해 낮은 temperature 적용
     });
 
     return result.toTextStreamResponse();

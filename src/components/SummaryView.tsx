@@ -12,7 +12,6 @@ import {
   Sparkles,
   Download,
   AlertCircle,
-  HelpCircle,
   ShieldCheck,
 } from 'lucide-react';
 import { ParsedDocument } from '@/lib/types';
@@ -20,11 +19,15 @@ import { ParsedDocument } from '@/lib/types';
 interface SummaryViewProps {
   document: ParsedDocument;
   onAskTutorWithTerm: (term: string) => void;
+  apiKey: string;
+  onOpenApiKeyModal: () => void;
 }
 
 export const SummaryView: React.FC<SummaryViewProps> = ({
   document,
   onAskTutorWithTerm,
+  apiKey,
+  onOpenApiKeyModal,
 }) => {
   const [summaryText, setSummaryText] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -36,14 +39,12 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  // 문서가 변경되거나 처음 로드될 때 요약 생성 트리거
   useEffect(() => {
     if (document) {
       generateSummary();
     }
-  }, [document.metadata.fileName]);
+  }, [document.metadata.fileName, apiKey]);
 
-  // 텍스트 선택(마우스 업) 감지 이벤트 핸들러
   useEffect(() => {
     const handleMouseUp = () => {
       const selection = window.getSelection();
@@ -83,6 +84,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
         body: JSON.stringify({
           documentText: document.fullText,
           documentTitle: document.metadata.fileName,
+          apiKey: apiKey.trim(),
         }),
       });
 
@@ -141,7 +143,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
 
   return (
     <div className="relative flex flex-col h-full bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      {/* 텍스트 선택 시 뜨는 플로팅 빠른 질문 버튼 */}
       {tooltipPos && selectedText && (
         <div
           style={{
@@ -172,7 +173,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
               <span>강의 자료 핵심 요약</span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
-                페이지별 근거 (p.X) 포함
+                Gemini 3.8 Flash
               </span>
             </h2>
             <p className="text-xs text-slate-500">
@@ -181,8 +182,16 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
           </div>
         </div>
 
-        {/* 액션 버튼 그룹 */}
         <div className="flex items-center space-x-2">
+          {!apiKey && (
+            <button
+              onClick={onOpenApiKeyModal}
+              className="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-300 rounded-lg hover:bg-amber-100 transition-colors"
+            >
+              API 키 입력
+            </button>
+          )}
+
           <button
             onClick={handleCopy}
             disabled={!summaryText || isLoading}
@@ -235,12 +244,20 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             <div>
               <p className="font-bold text-sm">요약 생성 중 오류가 발생했습니다</p>
               <p className="mt-1">{error}</p>
-              <button
-                onClick={generateSummary}
-                className="mt-2 px-3 py-1 bg-rose-600 text-white rounded-md font-semibold hover:bg-rose-700"
-              >
-                다시 시도
-              </button>
+              <div className="mt-2 flex space-x-2">
+                <button
+                  onClick={onOpenApiKeyModal}
+                  className="px-3 py-1 bg-amber-600 text-white rounded-md font-semibold hover:bg-amber-700"
+                >
+                  API 키 확인/변경
+                </button>
+                <button
+                  onClick={generateSummary}
+                  className="px-3 py-1 bg-rose-600 text-white rounded-md font-semibold hover:bg-rose-700"
+                >
+                  다시 시도
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -253,7 +270,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             </div>
             <div className="text-center space-y-1">
               <p className="text-sm font-bold text-slate-800">
-                업로드된 강의 자료의 전 페이지를 정독하고 있습니다...
+                Gemini 3.8 Flash가 강의 자료를 분석하고 있습니다...
               </p>
               <p className="text-xs text-slate-500">
                 주요 병태생리, 약물 정보, 간호중재 및 근거 페이지를 구조화하는 중입니다.
@@ -267,7 +284,6 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
-                // 페이지 번호 강조 렌더러
                 strong: ({ node, ...props }) => (
                   <strong className="font-bold text-slate-900" {...props} />
                 ),
@@ -285,20 +301,19 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             {isLoading && (
               <div className="inline-flex items-center space-x-1.5 text-xs text-teal-600 mt-4 font-medium animate-pulse">
                 <span className="w-2 h-2 rounded-full bg-teal-600 animate-ping" />
-                <span>AI가 실시간으로 핵심 내용을 정리하고 있습니다...</span>
+                <span>Gemini가 실시간으로 핵심 내용을 작성하고 있습니다...</span>
               </div>
             )}
           </div>
         ) : null}
       </div>
 
-      {/* 하단 근거 기반 신뢰성 안내 띠 */}
       <div className="px-6 py-2.5 bg-slate-50 border-t border-slate-200/80 flex items-center justify-between text-[11px] text-slate-500">
         <span className="flex items-center space-x-1">
           <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
           <span>모든 요약 항목은 강의 자료 내 페이지 번호 (p.X)를 근거로 작성되었습니다.</span>
         </span>
-        <span className="text-slate-400">의학적 환각 0% 원칙 적용</span>
+        <span className="text-slate-400">Google Gemini 3.8 Flash 연동</span>
       </div>
     </div>
   );

@@ -108,7 +108,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span>Strict Grounding 활성화</span>
         </div>
         <p className="text-emerald-700 text-[11px] leading-relaxed">
-          AI 모델이 임의의 지식을 날조하지 않고 오직 위 문서 내용만을 근거로 요약하고 설명합니다.
+          Google <strong>Gemini 3.8 Flash</strong>가 임의의 지식을 날조하지 않고 오직 강의 자료 내용만을 근거로 요약하고 설명합니다.
         </p>
       </div>
 
