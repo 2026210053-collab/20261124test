@@ -1,7 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // pdf-parse 라이브러리를 서버 외부 패키지로 지정 (Netlify 서버리스 함수 번들링 최적화)
-  serverExternalPackages: ['pdf-parse'],
+  // Next.js 14 서버 컴포넌트 외부 패키지 지정 (pdf-parse 번들링 최적화)
+  experimental: {
+    serverComponentsExternalPackages: ['pdf-parse'],
+  },
   webpack: (config, { isServer }) => {
     // 브라우저 클라이언트 번들링 시 node canvas 및 fs 누락 오류 방지
     if (!isServer) {
