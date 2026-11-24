@@ -1,0 +1,17 @@
+# Netlify 배포 설정 파일 (Next.js 14 App Router 지원)
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NPM_FLAGS = "--legacy-peer-deps"
+
+# Next.js App Router 공식 런타임 플러그인
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# 서버리스 함수에서 외부 패키지(pdf-parse 등) 번들링 보장
+[functions]
+  node_bundler = "esbuild"
